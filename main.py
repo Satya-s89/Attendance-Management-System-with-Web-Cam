@@ -1,9 +1,10 @@
-import subprocess
 import sys
 import os
 from datetime import datetime
 import pandas as pd
 from db import students_col, attendance_col
+from register import capture_and_register
+from attendance import run_attendance
 
 EXPORT_DIR = "data/exports"
 os.makedirs(EXPORT_DIR, exist_ok=True)
@@ -22,12 +23,10 @@ def view_registered():
     print(f"{'─'*55}\n")
 
 
-def view_attendance_by_date(date_str=None):
+def view_attendance_by_date():
+    date_str = input("  Enter date (YYYY-MM-DD) or press Enter for today: ").strip()
     if not date_str:
-        date_str = input("  Enter date (YYYY-MM-DD) or press Enter for today: ").strip()
-        if not date_str:
-            date_str = datetime.now().strftime("%Y-%m-%d")
-
+        date_str = datetime.now().strftime("%Y-%m-%d")
     records = list(attendance_col().find({"date": date_str}, {"_id": 0, "name": 1, "student_id": 1, "time": 1}))
     total = students_col().count_documents({})
     print(f"\n{'─'*55}")
@@ -96,14 +95,27 @@ def attendance_report():
         if s["student_id"] in present_ids:
             status = "PRESENT"
             time = present_ids[s["student_id"]]
-            color = "\033[92m"  # green
+            color = "\033[92m"
         else:
             status = "ABSENT"
             time = "—"
-            color = "\033[91m"  # red
+            color = "\033[91m"
         reset = "\033[0m"
         print(f"  {s['name']:<20} {s['student_id']:<18} {color}{status:<10}{reset} {time}")
     print(f"{'─'*60}\n")
+
+
+def register_student():
+    print("=== Student Face Registration ===")
+    while True:
+        name = input("\nEnter student name (or 'q' to go back): ").strip()
+        if name.lower() == 'q':
+            break
+        student_id = input("Enter student ID: ").strip()
+        if name and student_id:
+            capture_and_register(name, student_id)
+        else:
+            print("[WARN] Name and ID cannot be empty.")
 
 
 def main():
@@ -119,9 +131,9 @@ def main():
         choice = input("Select option: ").strip()
 
         if choice == "1":
-            subprocess.run([sys.executable, "register.py"])
+            register_student()
         elif choice == "2":
-            subprocess.run([sys.executable, "attendance.py"])
+            run_attendance()
         elif choice == "3":
             view_registered()
         elif choice == "4":
