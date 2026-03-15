@@ -131,9 +131,17 @@ def main():
         choice = input("Select option: ").strip()
 
         if choice == "1":
-            register_student()
+            try:
+                register_student()
+            except Exception as e:
+                print(f"[ERROR] {e}")
+                input("Press Enter to continue...")
         elif choice == "2":
-            run_attendance()
+            try:
+                run_attendance()
+            except Exception as e:
+                print(f"[ERROR] {e}")
+                input("Press Enter to continue...")
         elif choice == "3":
             view_registered()
         elif choice == "4":

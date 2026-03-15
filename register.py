@@ -1,6 +1,8 @@
 import cv2
 import face_recognition
 import numpy as np
+import sys
+import os
 from datetime import datetime
 from db import students_col
 
@@ -55,10 +57,12 @@ def draw_progress_bar(frame, progress, total, y=95):
 
 
 def capture_and_register(name, student_id):
-    cam = cv2.VideoCapture(0)
-    if not cam.isOpened():
-        print("[ERROR] Cannot open webcam.")
-        return
+    try:
+        cam = cv2.VideoCapture(0)
+        if not cam.isOpened():
+            print("[ERROR] Cannot open webcam.")
+            input("Press Enter to continue...")
+            return
 
     captured_encodings = []
     cooldown = 0
@@ -127,6 +131,14 @@ def capture_and_register(name, student_id):
 
     cam.release()
     cv2.destroyAllWindows()
+    except Exception as e:
+        print(f"[ERROR] {e}")
+        input("Press Enter to continue...")
+        try:
+            cam.release()
+        except:
+            pass
+        cv2.destroyAllWindows()
 
 
 if __name__ == "__main__":
