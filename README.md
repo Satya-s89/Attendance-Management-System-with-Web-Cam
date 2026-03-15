@@ -131,3 +131,10 @@ AttendanceSystem.exe
 - Share the `.exe` + a `.env` file with the MongoDB credentials
 - Or share the full project folder and have them follow the Setup steps above
 - Since the database is on MongoDB Atlas, all machines share the same student and attendance data
+
+
+## OR YOU CAN DOWNLOAD IT FROM HERE
+
+```
+https://drive.google.com/file/d/1AOS4xgBm9xWZNrL6wgpQybdVRHMXmiqZ/view?usp=sharing
+```
