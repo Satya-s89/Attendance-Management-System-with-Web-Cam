@@ -18,13 +18,12 @@ def load_all_encodings():
 
 
 def is_duplicate(new_encoding, tolerance=0.5):
-    _, known_encodings = load_all_encodings()
+    known_names, known_encodings = load_all_encodings()
     if not known_encodings:
         return False, None
     distances = face_recognition.face_distance(known_encodings, new_encoding)
     best = int(np.argmin(distances))
     if distances[best] < tolerance:
-        _, known_names = load_all_encodings()
         return True, known_names[best].rsplit("_", 1)[0]
     return False, None
 
