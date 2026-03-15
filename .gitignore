@@ -1,0 +1,4 @@
+.env
+data/encodings.pkl
+data/attendance/
+__pycache__/
