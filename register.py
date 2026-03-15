@@ -1,8 +1,6 @@
 import cv2
 import face_recognition
 import numpy as np
-import sys
-import os
 from datetime import datetime
 from db import students_col
 
@@ -57,98 +55,81 @@ def draw_progress_bar(frame, progress, total, y=95):
 
 
 def capture_and_register(name, student_id):
+    cam = None
     try:
         cam = cv2.VideoCapture(0)
         if not cam.isOpened():
             print("[ERROR] Cannot open webcam.")
-            input("Press Enter to continue...")
             return
 
-    captured_encodings = []
-    cooldown = 0
-    print(f"[INFO] Look at the camera. Capturing {SAMPLES_NEEDED} face samples automatically...")
+        captured_encodings = []
+        cooldown = 0
+        print(f"[INFO] Look at the camera. Capturing {SAMPLES_NEEDED} face samples automatically...")
 
-    while True:
-        ret, frame = cam.read()
-        if not ret:
-            break
+        while True:
+            ret, frame = cam.read()
+            if not ret:
+                break
 
-        display = frame.copy()
-        rgb = np.ascontiguousarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), dtype=np.uint8)
-        boxes = face_recognition.face_locations(rgb, model="hog")
-        encodings = face_recognition.face_encodings(rgb, boxes)
+            display = frame.copy()
+            rgb = np.ascontiguousarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), dtype=np.uint8)
+            boxes = face_recognition.face_locations(rgb, model="hog")
+            encodings = face_recognition.face_encodings(rgb, boxes)
 
-        status_msg = "Position your face in the frame"
-        status_color = (0, 200, 255)
+            status_msg = "Position your face in the frame"
+            status_color = (0, 200, 255)
 
-        if boxes:
-            top, right, bottom, left = boxes[0]
-            cv2.rectangle(display, (left, top), (right, bottom), (0, 255, 0), 2)
-            cv2.putText(display, "Face Detected", (left, top - 10),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+            if boxes:
+                top, right, bottom, left = boxes[0]
+                cv2.rectangle(display, (left, top), (right, bottom), (0, 255, 0), 2)
+                cv2.putText(display, "Face Detected", (left, top - 10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 
-            if cooldown == 0 and encodings:
-                enc = encodings[0]
-                is_dup, dup_name = is_duplicate(enc)
-                if is_dup and len(captured_encodings) == 0:
-                    status_msg = f"Already registered as: {dup_name}"
-                    status_color = (0, 0, 255)
-                else:
-                    captured_encodings.append(enc)
-                    cooldown = 15
-                    status_msg = f"Sample {len(captured_encodings)} captured!"
-                    status_color = (0, 255, 0)
-        else:
-            cv2.putText(display, "No face detected", (10, 110),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
+                if cooldown == 0 and encodings:
+                    enc = encodings[0]
+                    is_dup, dup_name = is_duplicate(enc)
+                    if is_dup and len(captured_encodings) == 0:
+                        status_msg = f"Already registered as: {dup_name}"
+                        status_color = (0, 0, 255)
+                    else:
+                        captured_encodings.append(enc)
+                        cooldown = 15
+                        status_msg = f"Sample {len(captured_encodings)} captured!"
+                        status_color = (0, 255, 0)
+            else:
+                cv2.putText(display, "No face detected", (10, 110),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
 
-        if cooldown > 0:
-            cooldown -= 1
+            if cooldown > 0:
+                cooldown -= 1
 
-        cv2.rectangle(display, (0, 0), (frame.shape[1], 55), (30, 30, 30), -1)
-        cv2.putText(display, f"Registering: {name}  |  ID: {student_id}",
-                    (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (255, 255, 255), 2)
-        cv2.putText(display, status_msg, (10, 80),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, status_color, 2)
-        draw_progress_bar(display, len(captured_encodings), SAMPLES_NEEDED)
-        cv2.putText(display, "Press Q to cancel", (frame.shape[1] - 200, frame.shape[0] - 10),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (150, 150, 150), 1)
-        cv2.imshow("Register Student", display)
+            cv2.rectangle(display, (0, 0), (frame.shape[1], 55), (30, 30, 30), -1)
+            cv2.putText(display, f"Registering: {name}  |  ID: {student_id}",
+                        (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (255, 255, 255), 2)
+            cv2.putText(display, status_msg, (10, 80),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, status_color, 2)
+            draw_progress_bar(display, len(captured_encodings), SAMPLES_NEEDED)
+            cv2.putText(display, "Press Q to cancel", (frame.shape[1] - 200, frame.shape[0] - 10),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (150, 150, 150), 1)
+            cv2.imshow("Register Student", display)
 
-        if len(captured_encodings) >= SAMPLES_NEEDED:
-            save_student(name, student_id, captured_encodings)
-            success = display.copy()
-            cv2.rectangle(success, (0, 0), (success.shape[1], success.shape[0]), (0, 180, 0), 10)
-            cv2.putText(success, "Registration Complete!", (50, success.shape[0] // 2),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 3)
-            cv2.imshow("Register Student", success)
-            cv2.waitKey(2000)
-            break
+            if len(captured_encodings) >= SAMPLES_NEEDED:
+                save_student(name, student_id, captured_encodings)
+                success = display.copy()
+                cv2.rectangle(success, (0, 0), (success.shape[1], success.shape[0]), (0, 180, 0), 10)
+                cv2.putText(success, "Registration Complete!", (50, success.shape[0] // 2),
+                            cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 3)
+                cv2.imshow("Register Student", success)
+                cv2.waitKey(2000)
+                break
 
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            print("[INFO] Registration cancelled.")
-            break
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                print("[INFO] Registration cancelled.")
+                break
 
-    cam.release()
-    cv2.destroyAllWindows()
     except Exception as e:
-        print(f"[ERROR] {e}")
-        input("Press Enter to continue...")
-        try:
+        print(f"[ERROR] Registration failed: {e}")
+    finally:
+        if cam is not None:
             cam.release()
-        except:
-            pass
         cv2.destroyAllWindows()
-
-
-if __name__ == "__main__":
-    print("=== Student Face Registration ===")
-    while True:
-        name = input("\nEnter student name (or 'q' to quit): ").strip()
-        if name.lower() == 'q':
-            break
-        student_id = input("Enter student ID: ").strip()
-        if name and student_id:
-            capture_and_register(name, student_id)
-        else:
-            print("[WARN] Name and ID cannot be empty.")

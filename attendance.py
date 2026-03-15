@@ -4,23 +4,20 @@ import numpy as np
 from datetime import datetime
 from db import students_col, attendance_col
 
-
 TOLERANCE = 0.5
 
 
 def load_encodings():
     docs = list(students_col().find({}, {"_id": 0, "name": 1, "student_id": 1, "encodings": 1}))
     if not docs:
-        print("[ERROR] No registered students found. Run register.py first.")
+        print("[ERROR] No registered students found. Register students first.")
         return None, None, 0
-
     final_encodings, final_names = [], []
     for doc in docs:
         encs = [np.array(e) for e in doc["encodings"]]
         avg_enc = np.mean(encs, axis=0)
         final_encodings.append(avg_enc)
         final_names.append(f"{doc['name']}_{doc['student_id']}")
-
     return final_encodings, final_names, len(final_names)
 
 
@@ -64,78 +61,80 @@ def draw_panel(frame, marked_names, total):
 
 
 def run_attendance():
-    final_encodings, final_names, total = load_encodings()
-    if final_encodings is None:
-        return
+    cam = None
+    try:
+        final_encodings, final_names, total = load_encodings()
+        if final_encodings is None:
+            return
 
-    marked_today = get_marked_today()
-    cam = cv2.VideoCapture(0)
-    if not cam.isOpened():
-        print("[ERROR] Cannot open webcam.")
-        return
+        marked_today = get_marked_today()
+        cam = cv2.VideoCapture(0)
+        if not cam.isOpened():
+            print("[ERROR] Cannot open webcam.")
+            return
 
-    print(f"[INFO] {total} students registered. {len(marked_today)} already marked today.")
-    print("[INFO] Press Q to stop.\n")
+        print(f"[INFO] {total} students registered. {len(marked_today)} already marked today.")
+        print("[INFO] Press Q to stop.\n")
 
-    frame_count = 0
-    boxes, encodings = [], []
+        frame_count = 0
+        boxes, encodings = [], []
 
-    while True:
-        ret, frame = cam.read()
-        if not ret:
-            break
+        while True:
+            ret, frame = cam.read()
+            if not ret:
+                break
 
-        if frame_count % 3 == 0:
-            small = cv2.resize(frame, (0, 0), fx=0.5, fy=0.5)
-            rgb = np.ascontiguousarray(cv2.cvtColor(small, cv2.COLOR_BGR2RGB), dtype=np.uint8)
-            boxes = face_recognition.face_locations(rgb, model="hog")
-            encodings = face_recognition.face_encodings(rgb, boxes)
-        frame_count += 1
+            if frame_count % 3 == 0:
+                small = cv2.resize(frame, (0, 0), fx=0.5, fy=0.5)
+                rgb = np.ascontiguousarray(cv2.cvtColor(small, cv2.COLOR_BGR2RGB), dtype=np.uint8)
+                boxes = face_recognition.face_locations(rgb, model="hog")
+                encodings = face_recognition.face_encodings(rgb, boxes)
+            frame_count += 1
 
-        for encoding, box in zip(encodings, boxes):
-            matches = face_recognition.compare_faces(final_encodings, encoding, tolerance=TOLERANCE)
-            name_id = "Unknown"
+            for encoding, box in zip(encodings, boxes):
+                matches = face_recognition.compare_faces(final_encodings, encoding, tolerance=TOLERANCE)
+                name_id = "Unknown"
+                if True in matches:
+                    distances = face_recognition.face_distance(final_encodings, encoding)
+                    best = int(np.argmin(distances))
+                    if matches[best]:
+                        name_id = final_names[best]
 
-            if True in matches:
-                distances = face_recognition.face_distance(final_encodings, encoding)
-                best = int(np.argmin(distances))
-                if matches[best]:
-                    name_id = final_names[best]
+                top, right, bottom, left = [v * 2 for v in box]
 
-            top, right, bottom, left = [v * 2 for v in box]
+                if name_id != "Unknown":
+                    parts = name_id.rsplit("_", 1)
+                    name = parts[0]
+                    student_id = parts[1] if len(parts) == 2 else "N/A"
+                    color = (0, 255, 0)
+                    label = f"{name} ({student_id})"
+                    marked_today = mark_attendance(name, student_id, marked_today)
+                    if name_id in marked_today:
+                        label += " [Present]"
+                else:
+                    color = (0, 0, 255)
+                    label = "Unknown"
 
-            if name_id != "Unknown":
-                parts = name_id.rsplit("_", 1)
-                name = parts[0]
-                student_id = parts[1] if len(parts) == 2 else "N/A"
-                color = (0, 255, 0)
-                label = f"{name} ({student_id})"
-                marked_today = mark_attendance(name, student_id, marked_today)
-                if name_id in marked_today:
-                    label += " [Present]"
-            else:
-                color = (0, 0, 255)
-                label = "Unknown"
+                cv2.rectangle(frame, (left, top), (right, bottom), color, 2)
+                cv2.rectangle(frame, (left, bottom - 28), (right, bottom), color, -1)
+                cv2.putText(frame, label, (left + 4, bottom - 8),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.52, (0, 0, 0), 1)
 
-            cv2.rectangle(frame, (left, top), (right, bottom), color, 2)
-            cv2.rectangle(frame, (left, bottom - 28), (right, bottom), color, -1)
-            cv2.putText(frame, label, (left + 4, bottom - 8),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.52, (0, 0, 0), 1)
+            cv2.rectangle(frame, (0, 0), (frame.shape[1] - 220, 40), (30, 30, 30), -1)
+            cv2.putText(frame, f"Attendance  |  {datetime.now().strftime('%Y-%m-%d  %H:%M:%S')}  |  Q=quit",
+                        (10, 27), cv2.FONT_HERSHEY_SIMPLEX, 0.58, (200, 200, 200), 1)
 
-        cv2.rectangle(frame, (0, 0), (frame.shape[1] - 220, 40), (30, 30, 30), -1)
-        cv2.putText(frame, f"Attendance  |  {datetime.now().strftime('%Y-%m-%d  %H:%M:%S')}  |  Q=quit",
-                    (10, 27), cv2.FONT_HERSHEY_SIMPLEX, 0.58, (200, 200, 200), 1)
+            draw_panel(frame, marked_today, total)
+            cv2.imshow("Attendance System", frame)
 
-        draw_panel(frame, marked_today, total)
-        cv2.imshow("Attendance System", frame)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
 
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
+        print(f"\n[DONE] {len(marked_today)} / {total} students marked present today.")
 
-    cam.release()
-    cv2.destroyAllWindows()
-    print(f"\n[DONE] {len(marked_today)} / {total} students marked present today.")
-
-
-if __name__ == "__main__":
-    run_attendance()
+    except Exception as e:
+        print(f"[ERROR] Attendance failed: {e}")
+    finally:
+        if cam is not None:
+            cam.release()
+        cv2.destroyAllWindows()
