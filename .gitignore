@@ -2,3 +2,6 @@
 data/encodings.pkl
 data/attendance/
 __pycache__/
+build/
+dist/
+*.spec
