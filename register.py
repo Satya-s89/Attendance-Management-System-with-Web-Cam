@@ -58,12 +58,17 @@ def capture_and_register(name, student_id):
     cam = None
     try:
         cam = cv2.VideoCapture(0)
+        cam.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+        cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
         if not cam.isOpened():
             print("[ERROR] Cannot open webcam.")
             return
 
         captured_encodings = []
         cooldown = 0
+        frame_count = 0
+        boxes, encodings = [], []
+
         print(f"[INFO] Look at the camera. Capturing {SAMPLES_NEEDED} face samples automatically...")
 
         while True:
@@ -72,9 +77,15 @@ def capture_and_register(name, student_id):
                 break
 
             display = frame.copy()
-            rgb = np.ascontiguousarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), dtype=np.uint8)
-            boxes = face_recognition.face_locations(rgb, model="hog")
-            encodings = face_recognition.face_encodings(rgb, boxes)
+
+            # Run face detection every 4th frame on quarter-size image
+            if frame_count % 4 == 0:
+                small = cv2.resize(frame, (0, 0), fx=0.25, fy=0.25)
+                rgb = np.ascontiguousarray(cv2.cvtColor(small, cv2.COLOR_BGR2RGB), dtype=np.uint8)
+                small_boxes = face_recognition.face_locations(rgb, model="hog")
+                encodings = face_recognition.face_encodings(rgb, small_boxes)
+                boxes = [(t*4, r*4, b*4, l*4) for t, r, b, l in small_boxes]
+            frame_count += 1
 
             status_msg = "Position your face in the frame"
             status_color = (0, 200, 255)
@@ -93,7 +104,7 @@ def capture_and_register(name, student_id):
                         status_color = (0, 0, 255)
                     else:
                         captured_encodings.append(enc)
-                        cooldown = 15
+                        cooldown = 20
                         status_msg = f"Sample {len(captured_encodings)} captured!"
                         status_color = (0, 255, 0)
             else:

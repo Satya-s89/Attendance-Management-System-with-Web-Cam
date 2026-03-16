@@ -1,5 +1,6 @@
 import os
 import sys
+import certifi
 from pymongo import MongoClient
 from dotenv import load_dotenv
 
@@ -19,7 +20,7 @@ def get_db():
         uri = os.getenv("MONGO_URI")
         if not uri:
             raise ValueError("MONGO_URI not found. Make sure .env file is in the same folder as the EXE.")
-        _client = MongoClient(uri, tls=True, tlsAllowInvalidCertificates=True)
+        _client = MongoClient(uri, tlsCAFile=certifi.where())
     return _client["attendance_db"]
 
 
