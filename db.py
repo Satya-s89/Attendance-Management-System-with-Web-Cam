@@ -19,7 +19,7 @@ def get_db():
         uri = os.getenv("MONGO_URI")
         if not uri:
             raise ValueError("MONGO_URI not found. Make sure .env file is in the same folder as the EXE.")
-        _client = MongoClient(uri)
+        _client = MongoClient(uri, tls=True, tlsAllowInvalidCertificates=True)
     return _client["attendance_db"]
 
 
