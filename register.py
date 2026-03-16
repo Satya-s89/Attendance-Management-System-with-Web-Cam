@@ -64,6 +64,8 @@ def capture_and_register(name, student_id):
 
         captured_encodings = []
         cooldown = 0
+        frame_count = 0
+        boxes, encodings = [], []
         print(f"[INFO] Look at the camera. Capturing {SAMPLES_NEEDED} face samples automatically...")
 
         while True:
@@ -72,9 +74,14 @@ def capture_and_register(name, student_id):
                 break
 
             display = frame.copy()
-            rgb = np.ascontiguousarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), dtype=np.uint8)
-            boxes = face_recognition.face_locations(rgb, model="hog")
-            encodings = face_recognition.face_encodings(rgb, boxes)
+            if frame_count % 4 == 0:
+                small = cv2.resize(frame, (0, 0), fx=0.4, fy=0.4)
+                rgb = np.ascontiguousarray(cv2.cvtColor(small, cv2.COLOR_BGR2RGB), dtype=np.uint8)
+                boxes = face_recognition.face_locations(rgb, model="hog")
+                boxes = [(int(t/0.4), int(r/0.4), int(b/0.4), int(l/0.4)) for t,r,b,l in boxes]
+                rgb_full = np.ascontiguousarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), dtype=np.uint8)
+                encodings = face_recognition.face_encodings(rgb_full, boxes)
+            frame_count += 1
 
             status_msg = "Position your face in the frame"
             status_color = (0, 200, 255)
@@ -87,7 +94,7 @@ def capture_and_register(name, student_id):
 
                 if cooldown == 0 and encodings:
                     enc = encodings[0]
-                    is_dup, dup_name = is_duplicate(enc)
+                    is_dup, dup_name = is_duplicate(enc) if len(captured_encodings) == 0 else (False, None)
                     if is_dup and len(captured_encodings) == 0:
                         status_msg = f"Already registered as: {dup_name}"
                         status_color = (0, 0, 255)

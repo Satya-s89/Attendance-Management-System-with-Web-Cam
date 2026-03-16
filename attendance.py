@@ -27,19 +27,23 @@ def get_marked_today():
     return set(f"{r['name']}_{r['student_id']}" for r in records)
 
 
-def mark_attendance(name, student_id, marked_today):
+def mark_attendance_bulk(detected, marked_today):
     now = datetime.now()
-    name_id = f"{name}_{student_id}"
-    if name_id not in marked_today:
-        attendance_col().insert_one({
-            "name": name,
-            "student_id": student_id,
-            "time": now.strftime("%H:%M:%S"),
-            "date": now.strftime("%Y-%m-%d"),
-            "timestamp": now
-        })
-        marked_today.add(name_id)
-        print(f"[MARKED] {name} (ID: {student_id}) at {now.strftime('%H:%M:%S')}")
+    new_records = []
+    for name, student_id in detected:
+        name_id = f"{name}_{student_id}"
+        if name_id not in marked_today:
+            new_records.append({
+                "name": name,
+                "student_id": student_id,
+                "time": now.strftime("%H:%M:%S"),
+                "date": now.strftime("%Y-%m-%d"),
+                "timestamp": now
+            })
+            marked_today.add(name_id)
+            print(f"[MARKED] {name} (ID: {student_id}) at {now.strftime('%H:%M:%S')}")
+    if new_records:
+        attendance_col().insert_many(new_records)
     return marked_today
 
 
@@ -84,37 +88,36 @@ def run_attendance():
             if not ret:
                 break
 
-            if frame_count % 3 == 0:
-                small = cv2.resize(frame, (0, 0), fx=0.5, fy=0.5)
+            if frame_count % 4 == 0:
+                small = cv2.resize(frame, (0, 0), fx=0.4, fy=0.4)
                 rgb = np.ascontiguousarray(cv2.cvtColor(small, cv2.COLOR_BGR2RGB), dtype=np.uint8)
                 boxes = face_recognition.face_locations(rgb, model="hog")
                 encodings = face_recognition.face_encodings(rgb, boxes)
             frame_count += 1
 
+            scale = int(1 / 0.4)
+            detected_this_frame = []
+            face_labels = []
+
             for encoding, box in zip(encodings, boxes):
-                matches = face_recognition.compare_faces(final_encodings, encoding, tolerance=TOLERANCE)
-                name_id = "Unknown"
-                if True in matches:
-                    distances = face_recognition.face_distance(final_encodings, encoding)
-                    best = int(np.argmin(distances))
-                    if matches[best]:
-                        name_id = final_names[best]
-
-                top, right, bottom, left = [v * 2 for v in box]
-
+                distances = face_recognition.face_distance(final_encodings, encoding)
+                best = int(np.argmin(distances))
+                name_id = final_names[best] if distances[best] < TOLERANCE else "Unknown"
                 if name_id != "Unknown":
                     parts = name_id.rsplit("_", 1)
-                    name = parts[0]
-                    student_id = parts[1] if len(parts) == 2 else "N/A"
-                    color = (0, 255, 0)
-                    label = f"{name} ({student_id})"
-                    marked_today = mark_attendance(name, student_id, marked_today)
-                    if name_id in marked_today:
-                        label += " [Present]"
+                    name, student_id = parts[0], parts[1] if len(parts) == 2 else "N/A"
+                    detected_this_frame.append((name, student_id))
+                    face_labels.append((box, True, f"{name} ({student_id})"))
                 else:
-                    color = (0, 0, 255)
-                    label = "Unknown"
+                    face_labels.append((box, False, "Unknown"))
 
+            marked_today = mark_attendance_bulk(detected_this_frame, marked_today)
+
+            for box, known, label in face_labels:
+                top, right, bottom, left = [v * scale for v in box]
+                color = (0, 255, 0) if known else (0, 0, 255)
+                if known:
+                    label += " [Present]"
                 cv2.rectangle(frame, (left, top), (right, bottom), color, 2)
                 cv2.rectangle(frame, (left, bottom - 28), (right, bottom), color, -1)
                 cv2.putText(frame, label, (left + 4, bottom - 8),
